@@ -1,0 +1,32 @@
+{
+	"name": "ror2-simulacrum-drones-dev",
+	"build": {
+		"dockerfile": "./Dockerfile.dev",
+		"context": "."
+	},
+
+	"runArgs": [
+	],
+
+	"postCreateCommand": "sudo chown -R ubuntu:ubuntu /workspaces",
+
+	"customizations": {
+        "vscode": {
+            "extensions": [
+				"ms-dotnettools.vscode-dotnet-pack",
+				"ms-dotnettools.dotnet-maui",
+				"eamodio.gitlens"
+			]
+        }
+    },
+
+	"features": {
+		"common": {
+			"username": "ubuntu",
+			"upgradePackages": true,
+			"nonFreePackages": false
+		}
+	},
+	"remoteUser": "ubuntu"
+}
+
