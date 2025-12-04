@@ -328,3 +328,6 @@ ASALocalRun/
 
 # MFractors (Xamarin productivity tool) working folder 
 .mfractor/
+
+# Ignore Packaged Thunderstore Files
+SimulacrumDronesPlugin.zip
