@@ -54,8 +54,57 @@ namespace SimulacrumDronesPlugin
         {
             // Init our logging class so that we can properly log for debugging
             Log.Init(Logger);
-            Log.Info("Simulacrum Drones Plugin Awake");
-            addDrones();
+            // Log.Info("Simulacrum Drones Plugin Awake");
+            // addDrones();
+            Log.Info("Subscribing to DirectorAPI InteractableActions event.");
+            DirectorAPI.InteractableActions += OnInteractableActions;
+            Log.Info("Subscribing to DirectorAPI StageSettingsActions event.");
+            DirectorAPI.StageSettingsActions += OnStageSettings;
+            Log.Info("Subscribing to HealthComponent TakeDamage event.");
+            On.RoR2.HealthComponent.TakeDamage += HealthComponent_TakeDamage;
+        }
+
+        public void OnDestroy()
+        {
+            Log.Info("Simulacrum Drones Plugin OnDestroy called.");
+            Log.Info("Unsubscribing from DirectorAPI InteractableActions event.");
+            DirectorAPI.InteractableActions -= OnInteractableActions;
+            Log.Info("Unsubscribing from DirectorAPI StageSettingsActions event.");
+            DirectorAPI.StageSettingsActions -= OnStageSettings;
+            Log.Info("Unsubscribing from HealthComponent TakeDamage event.");
+            On.RoR2.HealthComponent.TakeDamage -= HealthComponent_TakeDamage;
+        }
+
+        private void OnInteractableActions(DccsPool pool, DirectorAPI.StageInfo stageInfo)
+        {
+            if (Run.instance is InfiniteTowerRun)
+            {
+                Log.Info("OnInteractableActions called in Infinite Tower Run.");
+                addDrones();
+            }
+        }
+
+        private void OnStageSettings(DirectorAPI.StageSettings stageSettings, DirectorAPI.StageInfo stageInfo)
+        {
+            if (Run.instance is InfiniteTowerRun)
+            {
+                Log.Info("OnStageSettings called in Infinite Tower Run.");
+                // addDrones();
+
+                // Access the weights for each DirectorCardCategorySelection
+                foreach (var dccsEntry in stageSettings.InteractableCategoryWeightsPerDccs)
+                {
+                    var dccs = dccsEntry.Key;
+                    var weights = dccsEntry.Value;
+                    
+                    // Modify the weight of a specific category
+                    if (weights.ContainsKey("Drones"))
+                    {
+                        Log.Info("Settings Drones to a higher spawn rate.");
+                        weights["Drones"] = 100f;  // Make chests 5x more likely to be selected
+                    }
+                }
+            }
         }
 
         private void addDrones()
@@ -77,29 +126,73 @@ namespace SimulacrumDronesPlugin
                 var droneDirectorCardHolder  = new DirectorAPI.DirectorCardHolder
                 {
                     Card = droneDirectorCard,
-                    InteractableCategory = DirectorAPI.InteractableCategory.Drones
+                    InteractableCategory = DirectorAPI.InteractableCategory.Custom
+                    
                 };
                 DirectorAPI.Helpers.AddNewInteractable(droneDirectorCardHolder);
                 // DirectorAPIhelpers.AddNewInteractable(droneCardHolder);
                 Log.Info($"Drone successfully added: {droneAsset}");
             }
 
-            DirectorAPI.StageSettingsActions += (stageSettings, stageInfo) =>
-            {
-                // Access the weights for each DirectorCardCategorySelection
-                foreach (var dccsEntry in stageSettings.InteractableCategoryWeightsPerDccs)
-                {
-                    var dccs = dccsEntry.Key;
-                    var weights = dccsEntry.Value;
+            // DirectorAPI.StageSettingsActions += (stageSettings, stageInfo) =>
+            // {
+            //     // Access the weights for each DirectorCardCategorySelection
+            //     foreach (var dccsEntry in stageSettings.InteractableCategoryWeightsPerDccs)
+            //     {
+            //         var dccs = dccsEntry.Key;
+            //         var weights = dccsEntry.Value;
                     
-                    // Modify the weight of a specific category
-                    if (weights.ContainsKey("Drones"))
-                    {
-                        Log.Info("Settings Drones to a higher spawn rate.");
-                        weights["Drones"] = 100f;  // Make chests 5x more likely to be selected
-                    }
+            //         // Modify the weight of a specific category
+            //         if (weights.ContainsKey("Drones"))
+            //         {
+            //             Log.Info("Settings Drones to a higher spawn rate.");
+            //             weights["Drones"] = 100f;  // Make chests 5x more likely to be selected
+            //         }
+            //     }
+            // };
+        }
+
+        private void HealthComponent_TakeDamage(On.RoR2.HealthComponent.orig_TakeDamage orig, 
+        HealthComponent self, DamageInfo damageInfo)
+        {
+            // Check if this is void fog damage and the target is a drone
+            if (Run.instance is InfiniteTowerRun && damageInfo != null && self.body != null)
+            {
+                // Check if damage is from void fog (VoidFog damage type)
+                bool isVoidFogDamage = IsVoidFogDamage(damageInfo);
+                
+                // Check if the body is a drone (you can customize this check)
+                bool isDrone = IsDrone(self.body);
+                
+                if (isVoidFogDamage && isDrone)
+                {
+                    
+                    // Cancel the damage by returning early
+                    return;
                 }
-            };
+            }
+            
+            orig(self, damageInfo);
+        }
+
+        private bool IsDrone(CharacterBody body)
+        {
+            // Check body name for common drone identifiers
+            string bodyName = body.name. ToLower();
+            return bodyName.Contains("drone")
+                || body.bodyFlags.HasFlag(CharacterBody. BodyFlags.Mechanical);
+        }
+
+        private bool IsVoidFogDamage(DamageInfo damageInfo)
+        {
+            var damageType = damageInfo.damageType;
+            DamageType requiredFlags = DamageType.BypassArmor | DamageType. BypassBlock;
+            return damageInfo.inflictor == null 
+                && damageInfo.attacker == null 
+                && damageInfo.damageColorIndex == DamageColorIndex.Void
+                && damageType.damageTypeExtended == DamageTypeExtended.DamageField
+                && damageType.damageSource == DamageSource.Hazard
+                && (damageType.damageType & requiredFlags) == requiredFlags;
         }
     }
 }
